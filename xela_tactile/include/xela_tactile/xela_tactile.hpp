@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <chrono>
+#include <cstdlib>
 
 #include "xela_tactile/picojson.h"
 #include "xela_tactile/websocket_client.hpp"
@@ -25,7 +26,14 @@ private:
   rclcpp::Publisher<xela_msgs::msg::XelaServerMsg>::SharedPtr xela_server_pub_ = nullptr;
   rclcpp::TimerBase::SharedPtr timer_;
 
+  int connect_id_ = -1;
   std::shared_ptr<WebSocketClient> ws_client_;
+
+  std::string ip_;
+  int port_;
+  bool debag_;
+  std::string frame_id_;
+  std::string topic_name_;
 };
 }
 

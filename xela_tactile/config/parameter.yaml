@@ -1,0 +1,5 @@
+ip: "127.0.0.1"
+port: 5000
+debag: true
+frame_id: "xela_frame"
+topic_name: "xela_topic"

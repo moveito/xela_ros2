@@ -10,16 +10,29 @@ namespace xela_tactile
 XelaTactile::XelaTactile(const rclcpp::NodeOptions& options)
   : rclcpp::Node("xela_tactile", options)
 {
-  ws_client_ = std::make_shared<WebSocketClient>();
+  // declare parameter
+  this->declare_parameter("ip", "127.0.0.1");
+  this->declare_parameter("port", 5000);
+  this->declare_parameter("debag", false);
+  this->declare_parameter("frame_id", "xela_frame");
+  this->declare_parameter("topic_name", "xela_topic");
 
-  // TODO: ip & port -> do parameter
-  int id = ws_client_->connect("ws://127.0.0.1:5000");
-  if (id == -1)
+  // get parameter
+  this->get_parameter("ip", ip_);
+  this->get_parameter("port", port_);
+  this->get_parameter("debag", debag_);
+  this->get_parameter("frame_id", frame_id_);
+  this->get_parameter("topic_name", topic_name_);
+
+  ws_client_ = std::make_shared<WebSocketClient>();
+  connect_id_ = ws_client_->connect("ws://" + ip_ + ":" + std::to_string(port_));
+  if (connect_id_ == -1)
   {
     RCLCPP_ERROR(LOGGER, "Error: did not connect");
+    std::exit(1);
   }
 
-  xela_server_pub_ = this->create_publisher<xela_msgs::msg::XelaServerMsg>("xela_topic", 10);
+  xela_server_pub_ = this->create_publisher<xela_msgs::msg::XelaServerMsg>(topic_name_, 10);
 
   timer_ = this->create_wall_timer(100ms, std::bind(&XelaTactile::callbackTimer, this));
 }
@@ -31,20 +44,14 @@ XelaTactile::~XelaTactile()
 void XelaTactile::callbackTimer()
 {
   // get JSON string
-  //   Now I'm specifying a specific ID, which is not good. 
-  int id = 0;
-  ConnectionMetadata::ptr metadata = ws_client_->get_metadata(id);
+  ConnectionMetadata::ptr metadata = ws_client_->get_metadata(connect_id_);
 
   if (metadata)
   {
-    // print raw data
-    //   This is for debagging.
-    //   TODO:
-    //   if (debag_) // "debag_" is parameter.
-    //   {
-    //     RCLCPP_INFO(LOGGER, "received: %s", metadata->get_message().c_str());
-    //   }
-    RCLCPP_INFO(LOGGER, "received: %s", metadata->get_message().c_str());
+    if (debag_)
+    {
+      RCLCPP_INFO(LOGGER, "received: %s", metadata->get_message().c_str());
+    }
 
     // parse json
     picojson::value v;
@@ -52,6 +59,7 @@ void XelaTactile::callbackTimer()
     if (!err.empty())
     {
       RCLCPP_ERROR(LOGGER, "Error: parse json");
+      return;
     }
 
     // get each data
@@ -75,8 +83,7 @@ void XelaTactile::callbackTimer()
       // set each sensor's data in message
       auto sensor_data = std::make_unique<xela_msgs::msg::XelaServerMsg>();
       sensor_data->header.stamp = this->now();
-      // TODO:do parameter "frame_id"
-      sensor_data->header.frame_id = "xela_frame";
+      sensor_data->header.frame_id = frame_id_;
       sensor_data->sensor = sensor;
       sensor_data->model  = model;
       sensor_data->points.resize(taxels);
